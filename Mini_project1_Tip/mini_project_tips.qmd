@@ -1,0 +1,50 @@
+---
+title: "Tips_dataset"
+format: html
+editor: visual
+---
+
+> Imagine you are the waiter at a restaurant and want to estimate the tip based on the meal and some other characteristics. The goal of this project is to build linear models to predict `tips` based on characteristics of the meals. Use Root Mean Squared Error (RMSE) as the metric of error. We are looking for the model with lowest RMSE on the `tesing` data.
+
+```{r}
+# RMSE
+u <- c(1, 3, 2, -1, 5)
+v <- c(1, 2, 4, -1.5, 3)
+sqrt(mean((u-v)^2))         # RMSE
+```
+
+
+## Loading some important libraries
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(magrittr)
+```
+
+
+## Importing dataset
+
+We will use the dataset `tips` and for more information, read: [tips documentation](https://rdrr.io/cran/reshape2/man/tips.html).
+
+```{r}
+tip <- read_delim('https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv', 
+                  show_col_types = FALSE)
+```
+
+In order to work on the project, you should follow the following steps:
+
+1. Study the distribution of each variable. Trying to understand them by computing some statistics: mean, variance, ... and plot some graphics.
+
+2. Study the relation of each predictors to the target `tips` (statistically and graphically). Base on your investigation up to this stage, can you guess what variables are important to predict the tips?
+
+3. Build linear models based on your choice of inputs using `lm` function. The model should be trained on the training data and predict the testing data as defined below.
+
+```{r}
+n <- nrow(tip)
+train <- logical(n)
+set.seed(168) # This will fix the train-test split. You will have the same train and test data
+train[sample(n, 0.8*n)] <- TRUE
+tip_train <- tip[train,]         # Train data
+tip_test <- tip[!train,]         # Test data
+```
+4. Beautiful graphics and comments on your analysis are appreciated and to be expected. Good luck!
