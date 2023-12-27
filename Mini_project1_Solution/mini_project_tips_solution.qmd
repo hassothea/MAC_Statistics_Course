@@ -1,0 +1,185 @@
+---
+title: "Tips_dataset"
+format: html
+editor: visual
+---
+
+> Imagine you are the waiter at a restaurant and want to estimate the tip based on the meal and some other characteristics. The goal of this project is to build linear models to predict `tips` based on characteristics of the meals. Use Root Mean Squared Error (RMSE) as the metric of error. We are looking for the model with lowest RMSE on the `tesing` data.
+
+## Loading some important libraries
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(magrittr)
+```
+
+## Importing dataset
+
+We will use the dataset `tips` and for more information, read: [tips documentation](https://rdrr.io/cran/reshape2/man/tips.html).
+
+```{r}
+tip <- read_delim('https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv', 
+                  show_col_types = FALSE)
+```
+
+In order to work on the project, you should follow the following steps:
+
+1.  Study the distribution of each variable. Trying to understand them by computing some statistics: mean, variance, ... and plot some graphics. 
+
+To do this, we can use, for example, function `sumtable()` from `vtable` package. We will look at quantitative and qualitative data separately.
+
+### Quantitative variables
+
+```{r, warning=FALSE, message=FALSE}
+# install.packages("vtable")
+library(vtable)
+# numerical variables
+tip %>%
+  select(is.numeric) %>%
+  sumtable()
+```
+
+The values above can be represented graphically as below. To understand a single numerical variable, density function, histogram, boxplot or violinplot are the suitable type of graphic. 
+
+```{r, fig.ncol=3}
+# function that plot density on top of histogram
+
+plot_density <- function(variable = "", 
+                         bandwidth = 1, color = "gray"){
+  tip %>%
+    select(is.numeric) %>%
+    ggplot(aes(x = .data[[variable]])) +
+    geom_histogram(aes(y = after_stat(density)), 
+                   binwidth = bandwidth,
+                   fill = color) + 
+    geom_density() +
+    labs(title = paste0("Density of variable ", variable)) -> p
+  show(p)
+}
+
+tip %>%
+  select(is.numeric) %>%
+  colnames() %>%
+  map2(.y = c(5, 0.5, 0.5),
+       .f = ~ plot_density(.x, .y, color = "#6178C3")) -> temp
+
+```
+
+> Most of the bills are around $\$15$ and up to more than $\$50$. On the other hand, the tips are mostly around $\$2$ and only a few tips are higher than $\$7.5$ while the highest bill is $\$10$. Note that these high tips can be considered as outliers as majority of tips are less than $\$5$. One might remove them when trying to build the model.
+
+### Qualitative variables
+
+```{r}
+# categorical data
+tip %>%
+  select(!is.numeric) %>%
+  sumtable()
+```
+
+Distribution of each categorical variable.
+
+```{r}
+tip %>%
+  select(!is.numeric) %>%
+  pivot_longer(cols = everything(),
+               names_to = "variable",
+               values_to = "value") %>%
+  ggplot(aes(x = value)) +
+  geom_bar(aes(fill = variable)) +
+  facet_wrap(~ variable, scales = "free")
+  
+```
+
+> Most meal took place on Saturday and less than $20$ meals took places on Friday while majority of the meals are dinner. Moreover, males often pay for the meal while majority of individuals are non-smoker.
+
+2.  Study the relation of each predictors to the target `tips` (statistically and graphically). Base on your investigation up to this stage, can you guess what variables are important to predict the tips?
+
+```{r}
+tip |>
+  select(where(is.numeric)) %>%
+  cor()
+
+tip %>%
+  ggplot(aes(x = total_bill,
+             y = tip)) +
+  geom_point(aes(size = size, color = sex))   # lot of info
+
+tip %>%
+  ggplot(aes(x = time,
+             y = tip)) +   # quantitative vs quality
+  geom_violin(aes(fill = time))
+
+tip %>% 
+  ggplot(aes(x = day,
+             y = tip)) +
+  geom_violin(aes(fill = day))
+```
+
+- The correlation matrix shows that the total bill is highly correlated with the tip, while size of the meal also carries correlation close $0.5$ with tip as well. However, it is worth noticing the high correlation between the two numerical inputs which indicates that both of them might be redundant inputs in modeling tip.
+
+- The scatterplot conveys many information that the tips higher than $\$7$ are often given by the meal who also paied for the meal. For the lower tips, there is no different or relation between Gender and tips at all according to the scatterplot. The same thing can be observed between `tip` and `size`. Finally, the violinplots shows that type and day of do not play significant role in characterizing tips either.
+
+3.  Build linear models based on your choice of inputs using `lm` function. The model should be trained on the training data and predict the testing data as defined below.
+
+- Base on the previous investigation, we might try a few models:
+  - a model with all inputs
+  - a step subset search.
+  - a model with only total bill
+  - a model with higher degree of total bill
+
+```{r}
+n <- nrow(tip)
+train <- logical(n)
+set.seed(168) # This will fix the train-test split. You will have the same train and test data
+train[sample(n, 0.8*n)] <- TRUE
+tip_train <- tip[train,]         # Train data
+tip_test <- tip[!train,]         # Test data
+```
+
+
+```{r}
+full_model <- lm(tip ~ ., 
+                 data = tip_train)
+
+step_model <- step(full_model, 
+                      direction = "both")
+
+total_bill_model <- lm(tip ~ total_bill, 
+                       data = tip_train)
+
+higher_model <- lm(tip ~ total_bill + size + I(total_bill ^2), 
+                   data = tip_train)
+
+all_models <- list(full_model,
+                  step_model,
+                  total_bill_model,
+                  higher_model)
+```
+
+We shall look at the summary of all the models to have a glimpse of how they perform on the training data.
+
+```{r}
+all_models %>%
+  map(.f = summary)
+```
+
+> By looking at R-squared, one can feel how does the model perform on the training data. Also, we can look at which variable are significant in those cases. Remember that this is just the performance of the model on the data it was built. Now let's look at the performance of the models on the testing data.
+
+
+```{r}
+name <- c("MSE of full model: ",
+          "MSE of stepwise model: ",
+          "MSE of model with only total bill: ",
+          "MSE of model of higher degree model: ")
+
+map2(name,
+     all_models,
+     .f = function(x, y){
+       return(paste0(x, mean((tip_test$tip - predict(y, tip_test))^2)))
+     })
+```
+- The result suggested that the stepwise model with only two inputs: `size` and `total_bill` are the best one among all the constructed models.
+
+- Later, we will learn how to control the coefficients of the model to a limited range and that can play an important rule in improving model performance.
+
+
