@@ -1,0 +1,96 @@
+---
+title: "Chapter3: Linear regression"
+author: "Sothea"
+format: html
+editor: visual
+---
+
+## Simple linear regression
+
+```{r}
+# install.packages('ISLR2')
+# install.packages("tidyverse")
+library(ISLR2)
+library(tidyverse)
+Wage %>%
+  glimpse()
+
+
+Wage %>%
+  summary()
+```
+
+
+
+```{r}
+y <- Wage$wage
+
+
+Wage %>%
+  select(is.numeric) %>%
+  cor()
+
+
+
+Wage %>%
+  ggplot(aes(x = age,
+             y = wage)) +
+  geom_point() +
+  geom_smooth(method = "loess",
+              formula = y ~ x)
+
+
+
+mod <- lm(wage~age, data = Wage)
+
+summary(mod)
+```
+
+
+```{r}
+
+df <- Wage %>%
+  mutate(pred = mod$fitted.values)         # create new column on top of the dataset
+
+
+df %>%
+  ggplot(aes(x = age,
+             y = wage)) +
+  geom_point() +
+  geom_smooth(method = "lm",
+              formula = y ~ x) -> p
+
+df_pred <- tibble(age = Wage$age,
+                  wage = mod$fitted.values)
+
+p +
+  geom_point(data = df_pred, 
+             color = "red",
+             size = 2)
+```
+
+
+```{r}
+x <- seq(-3,3, length.out = 100)
+y <- dt(x, df = nrow(Wage) - 2)
+
+tibble(x = x,
+       density = y) %>%
+  ggplot(aes(x = x, y  = density)) +
+  geom_line(color = "blue") +
+  geom_line(data = tibble(x = x,
+                          density = dnorm(x)), color = "red")
+```
+
+## Homework
+
+1. Count how many distinct values of variable `year`?
+
+2. Make a graphic of relation between `year` and `wage`.
+
+3. Is it more reasonable to look at year as a categorical variable? Transform `year` to be *factor* using `as_factor` function.
+
+4. `lm` can predict `wage` using categorical variables. Build simple linear regression using other categorical variables (try each at a time against `wage`). What is the most interesting categorical variable in prediction `wage`?
+
+
+

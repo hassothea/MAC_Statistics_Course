@@ -1,0 +1,169 @@
+---
+title: "week3"
+author: "Sothea"
+format: html
+editor: visual
+---
+
+## Build model
+
+
+```{r}
+spam <- read_delim("https://raw.githubusercontent.com/hassothea/TeachingML/main/data/spam.txt", show_col_types = FALSE)
+
+spam %>% slice(3)
+# install.packages('FNN')
+library(FNN)
+n <- nrow(spam)
+d <- ncol(spam)
+K <- 10
+train <- sample(1:K, size = n, replace = TRUE)        # select k = size
+train
+
+res <- matrix(0, ncol = K, nrow = 49)
+for(k in 2:50){
+  for(j in 1:K){
+    mod_knn <- knn(k = k,
+               train = spam[train != j, 2:58],    # X of training data
+               cl = spam$type[train != j],      # y of training data
+               test = spam[train == j, 2:58])    # X of testing data
+
+    res[k-1,j] <- mean(mod_knn != spam$type[train == j])   # Error
+  }
+}
+
+err <- rowMeans(res)
+k_ <- 2:50
+err
+library(tidyverse)
+tibble(k = 2:50,
+       error = err) %>%
+  ggplot(aes(x = k,
+             y = error)) +
+  geom_line() +
+  geom_point(x = k_[which.min(k_)+1],
+             y = min(err), color = "red")
+
+```
+
+> We finished 10-fold cross-validation for choosing the best K for spam dataset in KNN model.
+
+
+
+```{r}
+spam %>%
+  glimpse()
+
+n <- nrow(spam)
+mask <- logical(n)
+mask[sample(n, 0.8*n)] <- TRUE
+
+spam_final <- spam %>%
+  select(-Id) %>%
+  mutate(type = ifelse(type == "spam", 1, 0)) # encode to 0, 1
+
+lg <- glm(type ~ ., data = spam_final[mask, ], family = binomial)
+
+summary(lg)
+
+sigmoid <- function(t) 1/(1+exp(-t))
+
+# y_hat = sigmoid(b0 + b1*make + b2*address + ....)
+
+x <- spam_final[!mask,]
+
+sigmoid(sum(lg$coefficients * c(1, as.numeric(x)[1:57])))
+
+# P(Y = 1 | X = x) = P(spam)
+
+
+p <- predict.glm(lg, newdata = x, type = "response")
+
+cl <- ifelse(p >= 0.5, 1, 0)
+
+mean(x$type != cl) * 100 # misclassified!
+
+# We have a formula for classifying email into spam or not!
+
+```
+
+```{r}
+fx <- function(x) x ^2 - 7 * x + 3
+
+x <- seq(0, 7, length = 100)
+y <- fx(x)
+
+tibble(x = x,
+       y = y) %>%
+  ggplot(aes( x = x,
+              y = y)) +
+  geom_line() -> p
+
+
+grad_descent <- function(n = 100, init = 0, alpha = 0.1, threshold = 1e-10, f){
+  grad <- function(x0, f) (f(x0 + 0.0000001) - f(x0))/h
+  x0 <- init # rep(0, d)
+  h <- 0.0000001
+  gr <- grad(x0, f)
+  x1 <- x0 - alpha * gr
+  res <- c()
+  for(iter in 1:n){
+    if(abs(x1 - x0) < threshold){
+      return(list(x_star = x1,
+                  steps = res))
+    } else{
+      x0 <- x1
+      gr <- grad(x0, f)
+      x1 <- x0 - alpha * gr
+      res <- c(res, x1)
+    }
+  }
+  return(list(x_star = x1,
+              steps = res))
+}
+
+
+f2 <- function(x) cos(pi*x)^2 * exp(-x^2)
+
+gd <- grad_descent(init = -0.1, alpha = 0.1, f = fx)
+
+path <- gd$steps
+
+p + geom_point(data = tibble(x = path,
+                             y = fx(path)),
+               color = "red") 
+
+```
+
+```{r}
+
+pca <- prcomp(spam[,2:58], 
+              scale. = TRUE, 
+              center = TRUE)
+
+as_tibble(pca$x) %>%
+  mutate(type = spam$type) %>%
+  ggplot(aes(x = PC1, 
+             y = PC2)) +
+  geom_point(aes(color = type, alpha = 0.01))
+
+```
+
+```{r}
+
+as_tibble(pca$x) %>%
+  mutate(type = ifelse(spam$type == "spam", 1, 0)) %>%
+  select(PC1, PC2, type) -> df2
+
+lg2 <- glm(type ~ ., data = df2[mask,], family = binomial)
+
+
+pred <- predict.glm(lg2, 
+                    newdata = df2[!mask, ],
+                    type = "response")
+y_hat <- ifelse(pred >= 0.5, 1, 0)
+mean(df2$type[!mask] != y_hat) * 100
+```
+
+
+

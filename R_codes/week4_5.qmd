@@ -1,0 +1,74 @@
+---
+title: "week4"
+format: html
+editor: visual
+---
+
+## Import data
+
+```{r}
+library(tidyverse)
+
+df <- read_delim("https://raw.githubusercontent.com/hassothea/TeachingML/main/data/wine-red.txt",
+                 show_col_types = FALSE)
+df %>%
+  glimpse()
+
+table(df$quality)
+
+
+# install "corrplot"
+
+X %>% 
+  GGally::ggpairs()
+
+
+
+X <- df %>% select(-id)
+
+id = logical(nrow(X))
+
+id[sample(nrow(X), size = 0.8*nrow(X))] = TRUE
+
+mod <- lm(quality ~ ., data = X[id,]) # qualty = a * alc + b * pH + c * resid.sugar 
+summary(mod)
+
+mean((X[!id, ]$quality - predict(mod, newdata = X[!id,]))^2)  # 0.4357499, 0.4524475,  0.5306677
+
+step(mod, direction = "both")
+
+
+y_hat <- knn.reg(train = X[id, -12], test = X[!id, -12], y = X[id,]$quality, k = 30)
+
+
+mean((X[!id, ]$quality - y_hat$pred)^2) 
+
+plot(mod)
+
+```
+
+
+```{r}
+TSS <- sum((X$quality - mean(X$quality))^2)
+RSS <- sum(mod$residuals^2)
+(TSS - RSS)/TSS
+
+# sum((y_i - mean(y))) = sum((y_hat-mean(y_hat))^2) + sum((y_i-y_hat_i)^2)
+
+var(mod$fitted.values)/var(X$quality)    # variation of prediction (model) /  variation of actual value
+```
+
+```{r}
+library(tibble)
+
+
+
+tibble(
+  y = unlist(c(X$quality, tibble(mod$fitted.values))),
+  type = rep(c("True", "Pred"), each = nrow(X))
+) %>%
+  ggplot(aes(y = y)) +
+  geom_boxplot(aes(color = type))
+```
+
+
